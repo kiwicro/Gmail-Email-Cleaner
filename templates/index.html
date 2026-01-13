@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Cleaner - Local Gmail Aggregation</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Email Cleaner</h1>
+        <p class="subtitle">Local Gmail aggregation - your data never leaves your machine</p>
+    </header>
+
+    <main>
+        <!-- Accounts Section -->
+        <section id="accounts-section" class="card">
+            <h2>Connected Accounts</h2>
+            <div id="accounts-list">
+                {% if accounts %}
+                    {% for account in accounts %}
+                    <div class="account-item" data-account-id="{{ account.id }}">
+                        <span class="account-email">{{ account.email or account.id }}</span>
+                        <span class="account-status {{ 'connected' if account.authenticated else 'disconnected' }}">
+                            {{ 'Connected' if account.authenticated else 'Disconnected' }}
+                        </span>
+                        <button class="btn btn-small btn-danger" onclick="removeAccount('{{ account.id }}')">Remove</button>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="no-accounts">No accounts connected yet.</p>
+                {% endif %}
+            </div>
+            <button id="add-account-btn" class="btn btn-primary" onclick="addAccount()">
+                + Add Gmail Account
+            </button>
+        </section>
+
+        <!-- Scan Controls -->
+        <section id="scan-section" class="card">
+            <h2>Scan Emails</h2>
+            <div class="scan-controls">
+                <div class="form-group">
+                    <label for="max-emails">Max emails per account:</label>
+                    <input type="number" id="max-emails" value="500" min="50" max="5000">
+                </div>
+                <div class="form-group">
+                    <label for="query-filter">Filter (optional):</label>
+                    <input type="text" id="query-filter" placeholder="e.g., is:unread, category:promotions">
+                </div>
+                <button id="scan-btn" class="btn btn-primary" onclick="startScan()">
+                    Scan All Accounts
+                </button>
+            </div>
+            <div id="scan-progress" class="progress-container" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <p id="progress-text">Scanning...</p>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section id="results-section" class="card" style="display: none;">
+            <h2>Results</h2>
+            <div class="view-toggle">
+                <button class="btn view-btn active" data-view="senders" onclick="switchView('senders')">
+                    By Sender
+                </button>
+                <button class="btn view-btn" data-view="domains" onclick="switchView('domains')">
+                    By Domain
+                </button>
+            </div>
+            <div id="results-container"></div>
+        </section>
+    </main>
+
+    <!-- Modal for sender details -->
+    <div id="detail-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Confirmation modal -->
+    <div id="confirm-modal" class="modal" style="display: none;">
+        <div class="modal-content modal-small">
+            <h3 id="confirm-title">Confirm Action</h3>
+            <p id="confirm-message"></p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeConfirmModal()">Cancel</button>
+                <button class="btn btn-danger" id="confirm-action-btn">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>All data is processed and stored locally on your machine. No data is ever sent to external servers.</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
