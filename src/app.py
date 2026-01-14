@@ -11,7 +11,7 @@ import threading
 from flask import Flask, render_template, jsonify, request, redirect, url_for, session, Response
 
 from .gmail_client import GmailAccountManager
-from .aggregator import EmailAggregator
+from .aggregator import EmailAggregator, AGE_CATEGORIES
 
 # Initialize Flask app
 app = Flask(
@@ -42,6 +42,15 @@ def index():
 def list_accounts():
     """List all connected accounts."""
     return jsonify(account_manager.list_accounts())
+
+
+@app.route('/api/age-categories', methods=['GET'])
+def get_age_categories():
+    """Get age category definitions for filtering."""
+    return jsonify([
+        {'key': key, 'label': label, 'max_days': max_days if max_days != float('inf') else None}
+        for key, label, max_days in AGE_CATEGORIES
+    ])
 
 
 @app.route('/api/accounts/add', methods=['POST'])
@@ -182,13 +191,15 @@ def get_results():
                     'total_count': d.total_count,
                     'total_size': d.total_size,
                     'sender_count': len(d.senders),
+                    'age_distribution': d.age_distribution,
                     'senders': [
                         {
                             'email': s.email,
                             'name': s.name,
                             'count': s.count,
                             'total_size': s.total_size,
-                            'has_unsubscribe': s.unsubscribe_link is not None
+                            'has_unsubscribe': s.unsubscribe_link is not None,
+                            'age_distribution': s.age_distribution
                         }
                         for s in sorted(d.senders.values(), key=lambda x: x.count, reverse=True)[:10]
                     ]
@@ -210,6 +221,7 @@ def get_results():
                     'total_size': s.total_size,
                     'has_unsubscribe': s.unsubscribe_link is not None,
                     'unsubscribe_link': s.unsubscribe_link,
+                    'age_distribution': s.age_distribution,
                     'recent_subjects': [e.subject for e in s.emails[:5]],
                     'recent_snippets': [e.snippet for e in s.emails[:3]]
                 }

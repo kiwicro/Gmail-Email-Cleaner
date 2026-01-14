@@ -339,6 +339,7 @@ main {
     text-align: right;
     color: var(--primary);
     font-weight: 700;
+    white-space: nowrap;
 }
 
 .domain-row .domain-actions {
@@ -382,6 +383,7 @@ main {
 .sender-row .sender-count {
     text-align: right;
     color: var(--text);
+    white-space: nowrap;
 }
 
 .sender-row .sender-actions {
@@ -783,12 +785,14 @@ footer {
 
 /* Size display */
 .size-badge {
+    display: inline-block;
     font-size: 0.75rem;
     color: var(--text-secondary);
     background: var(--background);
     padding: 0.15rem 0.5rem;
     border-radius: 10px;
     margin-left: 0.5rem;
+    white-space: nowrap;
 }
 
 /* Filter button */

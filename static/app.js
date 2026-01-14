@@ -6,6 +6,8 @@ let domainData = [];
 let expandedDomains = new Set();
 let selectedItems = new Set(); // Track selected items for bulk actions
 let savedScrollPosition = 0;
+let ageCategories = [];
+let selectedAgeFilter = 'all'; // 'all' or specific age category key
 
 // API helper
 async function api(endpoint, method = 'GET', data = null) {
@@ -134,17 +136,33 @@ async function loadResults() {
     section.style.display = 'block';
 
     try {
-        // Load both views - get all results
-        const [senderResult, domainResult] = await Promise.all([
+        // Load age categories, sender data, and domain data
+        const [ageCatsResult, senderResult, domainResult] = await Promise.all([
+            api('/api/age-categories'),
             api('/api/results?view=senders&limit=10000'),
             api('/api/results?view=domains&limit=10000')
         ]);
+        ageCategories = ageCatsResult || [];
         senderData = senderResult.results || [];
         domainData = domainResult.results || [];
+
+        // Update age filter dropdown
+        updateAgeFilterDropdown();
         renderResults();
     } catch (err) {
         container.innerHTML = '<p>Error loading results: ' + err.message + '</p>';
     }
+}
+
+function updateAgeFilterDropdown() {
+    const select = document.getElementById('age-filter');
+    if (!select) return;
+
+    select.innerHTML = '<option value="all">All Ages</option>';
+    ageCategories.forEach(cat => {
+        select.innerHTML += `<option value="${cat.key}">${cat.label}</option>`;
+    });
+    select.value = selectedAgeFilter;
 }
 
 function switchView(view) {
@@ -797,20 +815,55 @@ function filterResults() {
     renderResults();
 }
 
+function filterByAge() {
+    selectedAgeFilter = document.getElementById('age-filter').value;
+    renderResults();
+}
+
 function getFilteredSenderData() {
-    if (!searchQuery) return senderData;
-    return senderData.filter(s =>
-        s.name.toLowerCase().includes(searchQuery) ||
-        s.email.toLowerCase().includes(searchQuery) ||
-        s.domain.toLowerCase().includes(searchQuery)
-    );
+    let data = senderData;
+
+    // Filter by search query
+    if (searchQuery) {
+        data = data.filter(s =>
+            s.name.toLowerCase().includes(searchQuery) ||
+            s.email.toLowerCase().includes(searchQuery) ||
+            s.domain.toLowerCase().includes(searchQuery)
+        );
+    }
+
+    // Filter by age category
+    if (selectedAgeFilter !== 'all') {
+        data = data.filter(s => {
+            // Check if sender has emails in this age category
+            const ageDist = s.age_distribution || {};
+            return ageDist[selectedAgeFilter] > 0;
+        });
+    }
+
+    return data;
 }
 
 function getFilteredDomainData() {
-    if (!searchQuery) return domainData;
-    return domainData.filter(d =>
-        d.domain.toLowerCase().includes(searchQuery)
-    );
+    let data = domainData;
+
+    // Filter by search query
+    if (searchQuery) {
+        data = data.filter(d =>
+            d.domain.toLowerCase().includes(searchQuery)
+        );
+    }
+
+    // Filter by age category
+    if (selectedAgeFilter !== 'all') {
+        data = data.filter(d => {
+            // Check if domain has emails in this age category
+            const ageDist = d.age_distribution || {};
+            return ageDist[selectedAgeFilter] > 0;
+        });
+    }
+
+    return data;
 }
 
 // ============================================

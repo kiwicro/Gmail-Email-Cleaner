@@ -6,7 +6,8 @@ All processing happens locally.
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
-from email.utils import parseaddr
+from datetime import datetime, timezone
+from email.utils import parseaddr, parsedate_to_datetime
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -46,6 +47,82 @@ def validate_unsubscribe_url(url: str) -> Optional[str]:
         return None
 
 
+# Age category constants
+AGE_CATEGORIES = [
+    ('today', 'Today', 1),
+    ('week', 'This Week', 7),
+    ('month', 'This Month', 30),
+    ('3months', 'Last 3 Months', 90),
+    ('6months', 'Last 6 Months', 180),
+    ('year', 'Last Year', 365),
+    ('older', 'Older', float('inf'))
+]
+
+
+def parse_email_date(date_str: str) -> Optional[datetime]:
+    """
+    Parse email date string to datetime object.
+
+    Args:
+        date_str: Raw date string from email header
+
+    Returns:
+        datetime object or None if parsing fails
+    """
+    if not date_str:
+        return None
+
+    try:
+        # Try standard email date parsing
+        return parsedate_to_datetime(date_str)
+    except Exception:
+        pass
+
+    # Try common date formats as fallback
+    formats = [
+        '%a, %d %b %Y %H:%M:%S %z',
+        '%d %b %Y %H:%M:%S %z',
+        '%Y-%m-%d %H:%M:%S',
+        '%Y-%m-%dT%H:%M:%S%z',
+    ]
+
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+
+    return None
+
+
+def get_age_category(email_date: Optional[datetime]) -> str:
+    """
+    Determine the age category for an email based on its date.
+
+    Args:
+        email_date: datetime object or None
+
+    Returns:
+        Age category key (e.g., 'today', 'week', 'month', etc.)
+    """
+    if not email_date:
+        return 'older'  # Unknown dates go to oldest category
+
+    now = datetime.now(timezone.utc)
+
+    # Make email_date timezone-aware if it isn't
+    if email_date.tzinfo is None:
+        email_date = email_date.replace(tzinfo=timezone.utc)
+
+    days_old = (now - email_date).days
+
+    for category_key, _, max_days in AGE_CATEGORIES:
+        if days_old < max_days:
+            return category_key
+
+    return 'older'
+
+
 @dataclass
 class EmailInfo:
     """Information about a single email."""
@@ -55,6 +132,12 @@ class EmailInfo:
     snippet: str
     size: int = 0  # Size in bytes
     unsubscribe_link: Optional[str] = None
+    age_category: str = 'older'  # Age category key
+
+
+def create_age_distribution() -> dict[str, int]:
+    """Create an empty age distribution dict."""
+    return {key: 0 for key, _, _ in AGE_CATEGORIES}
 
 
 @dataclass
@@ -67,12 +150,15 @@ class SenderAggregation:
     total_size: int = 0  # Total size in bytes
     emails: list[EmailInfo] = field(default_factory=list)
     unsubscribe_link: Optional[str] = None
+    age_distribution: dict[str, int] = field(default_factory=create_age_distribution)
 
     def add_email(self, email_info: EmailInfo) -> None:
         """Add an email to this aggregation."""
         self.count += 1
         self.total_size += email_info.size
         self.emails.append(email_info)
+        # Track age distribution
+        self.age_distribution[email_info.age_category] += 1
         # Keep the most recent unsubscribe link
         if email_info.unsubscribe_link:
             self.unsubscribe_link = email_info.unsubscribe_link
@@ -85,6 +171,7 @@ class DomainAggregation:
     total_count: int = 0
     total_size: int = 0  # Total size in bytes
     senders: dict[str, SenderAggregation] = field(default_factory=dict)
+    age_distribution: dict[str, int] = field(default_factory=create_age_distribution)
 
     def add_sender(self, sender: SenderAggregation) -> None:
         """Add a sender to this domain aggregation."""
@@ -96,10 +183,16 @@ class DomainAggregation:
             existing.count += sender.count
             existing.total_size += sender.total_size
             existing.emails.extend(sender.emails)
+            # Merge age distribution
+            for cat, count in sender.age_distribution.items():
+                existing.age_distribution[cat] += count
             if sender.unsubscribe_link:
                 existing.unsubscribe_link = sender.unsubscribe_link
         self.total_count += sender.count
         self.total_size += sender.total_size
+        # Update domain's age distribution
+        for cat, count in sender.age_distribution.items():
+            self.age_distribution[cat] += count
 
 
 @dataclass
@@ -181,13 +274,18 @@ class EmailAggregator:
 
         name, email, domain = extract_sender_info(from_header)
 
+        # Parse date and calculate age category
+        parsed_date = parse_email_date(date)
+        age_category = get_age_category(parsed_date)
+
         email_info = EmailInfo(
             message_id=message_id,
             subject=subject,
             date=date,
             snippet=snippet,
             size=size,
-            unsubscribe_link=unsubscribe_link
+            unsubscribe_link=unsubscribe_link,
+            age_category=age_category
         )
 
         return name, email, domain, email_info
