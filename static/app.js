@@ -247,7 +247,7 @@ function renderSendersTable() {
                     <span class="sender-email">${escapeHtml(sender.email)}</span>
                 </td>
                 <td>${escapeHtml(sender.domain)}</td>
-                <td class="sender-count">${sender.count}<span class="size-badge">${formatSize(sender.total_size || 0)}</span></td>
+                <td class="sender-count col-count">${sender.count}<span class="size-badge">${formatSize(sender.total_size || 0)}</span></td>
                 <td class="sender-actions">
                     <button class="action-btn view" onclick="showSenderDetails('${sender.account_id}', '${escapeAttr(sender.email)}')">View</button>
                     ${sender.has_unsubscribe ? `<button class="action-btn unsub" onclick="openUnsubscribe('${sender.account_id}', '${escapeAttr(sender.email)}')">Unsub</button>` : ''}
@@ -411,7 +411,7 @@ function renderDomainsTable() {
                     </div>
                 </td>
                 <td onclick="toggleDomain('${escapeAttr(domain.domain)}')">${domain.sender_count} sender${domain.sender_count !== 1 ? 's' : ''}</td>
-                <td class="domain-count" onclick="toggleDomain('${escapeAttr(domain.domain)}')">${domain.total_count}<span class="size-badge">${formatSize(domain.total_size || 0)}</span></td>
+                <td class="domain-count col-count" onclick="toggleDomain('${escapeAttr(domain.domain)}')">${domain.total_count}<span class="size-badge">${formatSize(domain.total_size || 0)}</span></td>
                 <td class="domain-actions" onclick="event.stopPropagation()">
                     <button class="action-btn filter" onclick="createFilter('${domain.account_id}', null, '${escapeAttr(domain.domain)}')" title="Create filter for entire domain">Filter</button>
                     <button class="action-btn trash" onclick="confirmTrash('${domain.account_id}', null, '${escapeAttr(domain.domain)}', ${domain.total_count})">Trash</button>
@@ -432,7 +432,7 @@ function renderDomainsTable() {
                             ${sender.has_unsubscribe ? '<span class="unsub-indicator" title="Unsubscribe available"></span>' : ''}
                             <span class="sender-email">${escapeHtml(sender.email)}</span>
                         </td>
-                        <td class="sender-count">${sender.count}<span class="size-badge">${formatSize(sender.total_size || 0)}</span></td>
+                        <td class="sender-count col-count">${sender.count}<span class="size-badge">${formatSize(sender.total_size || 0)}</span></td>
                         <td class="sender-actions">
                             <button class="action-btn view" onclick="showSenderDetails('${domain.account_id}', '${escapeAttr(sender.email)}')">View</button>
                             ${sender.has_unsubscribe ? `<button class="action-btn unsub" onclick="openUnsubscribe('${domain.account_id}', '${escapeAttr(sender.email)}')">Unsub</button>` : ''}

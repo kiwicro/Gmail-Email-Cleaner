@@ -282,8 +282,13 @@ main {
 .pivot-table th.col-checkbox { width: 40px; }
 .pivot-table th.col-domain { width: 20%; }
 .pivot-table th.col-sender { width: 25%; }
-.pivot-table th.col-count { width: 10%; text-align: right; }
-.pivot-table th.col-actions { width: 35%; text-align: right; }
+.pivot-table th.col-count { width: 12%; text-align: right; }
+.pivot-table th.col-actions { width: 33%; text-align: right; }
+
+.pivot-table td.col-count {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
 
 .col-checkbox {
     width: 40px;
