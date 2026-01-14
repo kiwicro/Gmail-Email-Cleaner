@@ -4,6 +4,7 @@ All data stays local - no external transmission.
 """
 
 import os
+import stat
 import json
 import base64
 import re
@@ -22,7 +23,8 @@ from googleapiclient.errors import HttpError
 # Gmail API scopes - only request what we need
 SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly',      # Read emails
-    'https://www.googleapis.com/auth/gmail.modify',        # Mark as spam/read
+    'https://www.googleapis.com/auth/gmail.modify',        # Mark as spam/trash
+    'https://www.googleapis.com/auth/gmail.settings.basic', # Create filters
 ]
 
 # Paths
@@ -137,9 +139,17 @@ class GmailClient:
             )
             self.credentials = flow.run_local_server(port=0)
 
-        # Save credentials for next run
+        # Save credentials for next run with secure permissions
         with open(self.token_path, 'w') as token_file:
             token_file.write(self.credentials.to_json())
+
+        # Set file permissions to owner-only (600 on Unix, restricted on Windows)
+        try:
+            if os.name != 'nt':  # Unix/Linux/Mac
+                os.chmod(self.token_path, stat.S_IRUSR | stat.S_IWUSR)  # 600
+            # Windows: file is already user-owned by default
+        except OSError:
+            pass  # Best effort - don't fail if permissions can't be set
 
         # Build service
         self.service = build('gmail', 'v1', credentials=self.credentials)
