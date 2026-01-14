@@ -561,6 +561,10 @@ footer {
     margin-top: 2rem;
 }
 
+footer .support-link {
+    margin-top: 1rem;
+}
+
 /* Loading state */
 .loading {
     text-align: center;

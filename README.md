@@ -333,6 +333,14 @@ Issues and pull requests welcome! This is a personal tool shared for anyone who 
 
 ---
 
+## Support
+
+If you find this tool useful, consider supporting the project:
+
+[![Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/U7U41SAOJ6)
+
+---
+
 ## License
 
 MIT License - Free to use, modify, and distribute.
