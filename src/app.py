@@ -27,8 +27,9 @@ app.secret_key = secrets.token_hex(32)
 account_manager = GmailAccountManager()
 aggregator = EmailAggregator(account_manager)
 
-# Store scan progress
+# Store scan progress (with cleanup of old entries)
 scan_progress = {}
+MAX_SCAN_HISTORY = 100  # Limit stored scan entries to prevent memory leak
 
 
 @app.route('/')
@@ -132,6 +133,13 @@ def start_scan():
     account_id = data.get('account_id')  # None means all accounts
     max_emails = data.get('max_emails')  # None means all emails
     query = data.get('query', '')
+
+    # Clean up old scan entries to prevent memory leak
+    if len(scan_progress) >= MAX_SCAN_HISTORY:
+        # Remove oldest completed/failed scans
+        completed = [k for k, v in scan_progress.items() if v.get('status') in ('completed', 'failed')]
+        for old_id in completed[:len(completed)//2]:
+            del scan_progress[old_id]
 
     scan_id = secrets.token_hex(8)
     scan_progress[scan_id] = {

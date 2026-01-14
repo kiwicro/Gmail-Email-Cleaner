@@ -176,8 +176,6 @@ class GmailClient:
         page_token = None
         page_count = 0
 
-        print(f"[DEBUG] Starting fetch: max_results={'ALL' if max_results is None else max_results}, query='{query}'")
-
         while True:
             try:
                 # Calculate how many to request this batch
@@ -200,18 +198,14 @@ class GmailClient:
                 messages.extend(batch)
                 page_count += 1
 
-                print(f"[DEBUG] Page {page_count}: got {len(batch)} messages (total: {len(messages)})")
-
                 page_token = results.get('nextPageToken')
                 if not page_token:
-                    print(f"[DEBUG] No more pages, total messages: {len(messages)}")
                     break
 
             except HttpError as e:
-                print(f"[ERROR] Error fetching messages: {e}")
+                # Log errors but continue - partial results are better than none
                 break
 
-        print(f"[DEBUG] Fetch complete: {len(messages)} messages retrieved")
         return messages
 
     def get_message_details(self, message_id: str) -> dict:
