@@ -4,9 +4,11 @@ All data stays local - served only on localhost.
 """
 
 import os
+import io
+import csv
 import secrets
 import threading
-from flask import Flask, render_template, jsonify, request, redirect, url_for, session
+from flask import Flask, render_template, jsonify, request, redirect, url_for, session, Response
 
 from .gmail_client import GmailAccountManager
 from .aggregator import EmailAggregator
@@ -178,12 +180,14 @@ def get_results():
                     'account_id': acc_id,
                     'domain': d.domain,
                     'total_count': d.total_count,
+                    'total_size': d.total_size,
                     'sender_count': len(d.senders),
                     'senders': [
                         {
                             'email': s.email,
                             'name': s.name,
                             'count': s.count,
+                            'total_size': s.total_size,
                             'has_unsubscribe': s.unsubscribe_link is not None
                         }
                         for s in sorted(d.senders.values(), key=lambda x: x.count, reverse=True)[:10]
@@ -203,6 +207,7 @@ def get_results():
                     'name': s.name,
                     'domain': s.domain,
                     'count': s.count,
+                    'total_size': s.total_size,
                     'has_unsubscribe': s.unsubscribe_link is not None,
                     'unsubscribe_link': s.unsubscribe_link,
                     'recent_subjects': [e.subject for e in s.emails[:5]],
@@ -352,6 +357,92 @@ def get_unsubscribe():
             'success': False,
             'error': 'No unsubscribe link found for this sender'
         })
+
+
+@app.route('/api/action/filter', methods=['POST'])
+def create_filter():
+    """Create a Gmail filter for a sender or domain."""
+    data = request.json or {}
+    account_id = data.get('account_id')
+    sender_email = data.get('sender_email')
+    domain = data.get('domain')
+    action = data.get('action', 'trash')  # trash, spam, archive, read
+
+    if not account_id:
+        return jsonify({'error': 'account_id required'}), 400
+
+    if not sender_email and not domain:
+        return jsonify({'error': 'sender_email or domain required'}), 400
+
+    # Validate action
+    if action not in ('trash', 'spam', 'archive', 'read'):
+        action = 'trash'
+
+    client = account_manager.get_account(account_id)
+    if not client:
+        return jsonify({'error': 'Account not found'}), 404
+
+    result = client.create_filter(
+        sender_email=sender_email,
+        domain=domain,
+        action=action
+    )
+
+    return jsonify(result)
+
+
+@app.route('/api/export/csv', methods=['GET'])
+def export_csv():
+    """Export results as CSV file."""
+    view = request.args.get('view', 'senders')
+
+    if view not in ('senders', 'domains'):
+        view = 'senders'
+
+    # Create CSV in memory
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    if view == 'senders':
+        # Header
+        writer.writerow(['Account', 'Sender Name', 'Sender Email', 'Domain', 'Email Count', 'Total Size (MB)', 'Has Unsubscribe'])
+
+        # Data
+        for acc_id, agg in aggregator.aggregations.items():
+            for sender in sorted(agg.senders.values(), key=lambda x: x.count, reverse=True):
+                writer.writerow([
+                    agg.email_address,
+                    sender.name,
+                    sender.email,
+                    sender.domain,
+                    sender.count,
+                    round(sender.total_size / (1024 * 1024), 2),  # Convert to MB
+                    'Yes' if sender.unsubscribe_link else 'No'
+                ])
+    else:
+        # Header
+        writer.writerow(['Account', 'Domain', 'Sender Count', 'Email Count', 'Total Size (MB)'])
+
+        # Data
+        for acc_id, agg in aggregator.aggregations.items():
+            for domain in sorted(agg.domains.values(), key=lambda x: x.total_count, reverse=True):
+                writer.writerow([
+                    agg.email_address,
+                    domain.domain,
+                    len(domain.senders),
+                    domain.total_count,
+                    round(domain.total_size / (1024 * 1024), 2)  # Convert to MB
+                ])
+
+    # Prepare response
+    output.seek(0)
+    filename = f'gmail_cleanmail_{view}.csv'
+
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename={filename}'}
+    )
 
 
 def run_app(host='127.0.0.1', port=5000, debug=False):

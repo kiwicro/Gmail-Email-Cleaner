@@ -7,6 +7,14 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">
+        <span id="theme-icon">🌙</span>
+    </button>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
     <header>
         <h1>Gmail Email Cleanmail</h1>
         <p class="subtitle">Local Gmail aggregation - your data never leaves your machine</p>
@@ -59,14 +67,38 @@
         <!-- Results Section -->
         <section id="results-section" class="card" style="display: none;">
             <h2>Results</h2>
-            <div class="view-toggle">
-                <button class="btn view-btn active" data-view="senders" onclick="switchView('senders')">
-                    By Sender
-                </button>
-                <button class="btn view-btn" data-view="domains" onclick="switchView('domains')">
-                    By Domain
-                </button>
+
+            <!-- Results Toolbar -->
+            <div class="results-toolbar">
+                <div class="view-toggle">
+                    <button class="btn view-btn active" data-view="senders" onclick="switchView('senders')">
+                        By Sender
+                    </button>
+                    <button class="btn view-btn" data-view="domains" onclick="switchView('domains')">
+                        By Domain
+                    </button>
+                </div>
+
+                <div class="search-box">
+                    <input type="text" id="results-search" placeholder="Search results..." oninput="filterResults()">
+                </div>
+
+                <select class="sort-select" id="sort-select" onchange="sortResults()">
+                    <option value="count-desc">Most emails first</option>
+                    <option value="count-asc">Fewest emails first</option>
+                    <option value="size-desc">Largest size first</option>
+                    <option value="size-asc">Smallest size first</option>
+                    <option value="name-asc">Name A-Z</option>
+                    <option value="name-desc">Name Z-A</option>
+                </select>
+
+                <div class="toolbar-actions">
+                    <button class="btn btn-secondary btn-small" onclick="exportCSV()">
+                        Export CSV
+                    </button>
+                </div>
             </div>
+
             <div id="results-container"></div>
         </section>
     </main>

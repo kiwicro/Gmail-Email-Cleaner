@@ -31,12 +31,13 @@ async function addAccount() {
     try {
         const result = await api('/api/accounts/add', 'POST', {});
         if (result.success) {
-            location.reload();
+            showToast('Account added successfully!', 'success');
+            setTimeout(() => location.reload(), 1000);
         } else {
-            alert('Error: ' + result.error);
+            showToast('Error: ' + result.error, 'error');
         }
     } catch (err) {
-        alert('Error adding account: ' + err.message);
+        showToast('Error adding account: ' + err.message, 'error');
     } finally {
         btn.disabled = false;
         btn.textContent = '+ Add Gmail Account';
@@ -50,9 +51,10 @@ async function removeAccount(accountId) {
 
     try {
         await api(`/api/accounts/${accountId}/remove`, 'POST');
-        location.reload();
+        showToast('Account removed successfully', 'success');
+        setTimeout(() => location.reload(), 1000);
     } catch (err) {
-        alert('Error removing account: ' + err.message);
+        showToast('Error removing account: ' + err.message, 'error');
     }
 }
 
@@ -163,15 +165,22 @@ function renderResults() {
 
 function renderSendersTable() {
     const container = document.getElementById('results-container');
+    const filteredData = getFilteredSenderData();
 
     if (!senderData || senderData.length === 0) {
         container.innerHTML = '<p class="no-results">No results yet. Run a scan first.</p>';
         return;
     }
 
+    if (filteredData.length === 0) {
+        container.innerHTML = '<p class="no-results">No results match your search.</p>';
+        return;
+    }
+
     // Calculate totals
-    const totalEmails = senderData.reduce((sum, s) => sum + s.count, 0);
-    const totalSenders = senderData.length;
+    const totalEmails = filteredData.reduce((sum, s) => sum + s.count, 0);
+    const totalSize = filteredData.reduce((sum, s) => sum + (s.total_size || 0), 0);
+    const totalSenders = filteredData.length;
     const selectedCount = selectedItems.size;
 
     let html = `
@@ -184,6 +193,10 @@ function renderSendersTable() {
                 <div class="stat-value">${totalSenders}</div>
                 <div class="stat-label">Unique Senders</div>
             </div>
+            <div class="summary-stat">
+                <div class="stat-value">${formatSize(totalSize)}</div>
+                <div class="stat-label">Total Size</div>
+            </div>
         </div>
         <div class="bulk-actions ${selectedCount > 0 ? 'visible' : ''}">
             <span class="bulk-count">${selectedCount} selected</span>
@@ -194,17 +207,17 @@ function renderSendersTable() {
         <table class="pivot-table">
             <thead>
                 <tr>
-                    <th class="col-checkbox"><input type="checkbox" onchange="toggleSelectAll(this)" ${selectedCount === senderData.length && selectedCount > 0 ? 'checked' : ''}></th>
+                    <th class="col-checkbox"><input type="checkbox" onchange="toggleSelectAll(this)" ${selectedCount === filteredData.length && selectedCount > 0 ? 'checked' : ''}></th>
                     <th class="col-sender">Sender</th>
                     <th class="col-domain">Domain</th>
-                    <th class="col-count">Count</th>
+                    <th class="col-count">Count / Size</th>
                     <th class="col-actions">Actions</th>
                 </tr>
             </thead>
             <tbody>
     `;
 
-    for (const sender of senderData) {
+    for (const sender of filteredData) {
         const itemKey = `sender:${sender.account_id}:${sender.email}`;
         const isSelected = selectedItems.has(itemKey);
         html += `
@@ -216,10 +229,11 @@ function renderSendersTable() {
                     <span class="sender-email">${escapeHtml(sender.email)}</span>
                 </td>
                 <td>${escapeHtml(sender.domain)}</td>
-                <td class="sender-count">${sender.count}</td>
+                <td class="sender-count">${sender.count}<span class="size-badge">${formatSize(sender.total_size || 0)}</span></td>
                 <td class="sender-actions">
                     <button class="action-btn view" onclick="showSenderDetails('${sender.account_id}', '${escapeAttr(sender.email)}')">View</button>
-                    ${sender.has_unsubscribe ? `<button class="action-btn unsub" onclick="openUnsubscribe('${sender.account_id}', '${escapeAttr(sender.email)}')">Unsubscribe</button>` : ''}
+                    ${sender.has_unsubscribe ? `<button class="action-btn unsub" onclick="openUnsubscribe('${sender.account_id}', '${escapeAttr(sender.email)}')">Unsub</button>` : ''}
+                    <button class="action-btn filter" onclick="createFilter('${sender.account_id}', '${escapeAttr(sender.email)}', null)" title="Create filter to auto-trash future emails">Filter</button>
                     <button class="action-btn trash" onclick="confirmTrash('${sender.account_id}', '${escapeAttr(sender.email)}', null, ${sender.count})">Trash</button>
                     <button class="action-btn spam" onclick="confirmSpam('${sender.account_id}', '${escapeAttr(sender.email)}', null, ${sender.count})">Spam</button>
                 </td>
@@ -306,16 +320,23 @@ function toggleDomain(domain) {
 
 function renderDomainsTable() {
     const container = document.getElementById('results-container');
+    const filteredData = getFilteredDomainData();
 
     if (!domainData || domainData.length === 0) {
         container.innerHTML = '<p class="no-results">No results yet. Run a scan first.</p>';
         return;
     }
 
+    if (filteredData.length === 0) {
+        container.innerHTML = '<p class="no-results">No results match your search.</p>';
+        return;
+    }
+
     // Calculate totals
-    const totalEmails = domainData.reduce((sum, d) => sum + d.total_count, 0);
-    const totalDomains = domainData.length;
-    const totalSenders = domainData.reduce((sum, d) => sum + d.sender_count, 0);
+    const totalEmails = filteredData.reduce((sum, d) => sum + d.total_count, 0);
+    const totalSize = filteredData.reduce((sum, d) => sum + (d.total_size || 0), 0);
+    const totalDomains = filteredData.length;
+    const totalSenders = filteredData.reduce((sum, d) => sum + d.sender_count, 0);
     const selectedCount = selectedItems.size;
 
     let html = `
@@ -332,6 +353,10 @@ function renderDomainsTable() {
                 <div class="stat-value">${totalSenders}</div>
                 <div class="stat-label">Unique Senders</div>
             </div>
+            <div class="summary-stat">
+                <div class="stat-value">${formatSize(totalSize)}</div>
+                <div class="stat-label">Total Size</div>
+            </div>
         </div>
         <div class="bulk-actions ${selectedCount > 0 ? 'visible' : ''}">
             <span class="bulk-count">${selectedCount} selected</span>
@@ -342,17 +367,17 @@ function renderDomainsTable() {
         <table class="pivot-table">
             <thead>
                 <tr>
-                    <th class="col-checkbox"><input type="checkbox" onchange="toggleSelectAll(this)" ${selectedCount === domainData.length && selectedCount > 0 ? 'checked' : ''}></th>
+                    <th class="col-checkbox"><input type="checkbox" onchange="toggleSelectAll(this)" ${selectedCount === filteredData.length && selectedCount > 0 ? 'checked' : ''}></th>
                     <th class="col-domain">Domain</th>
                     <th class="col-sender">Senders</th>
-                    <th class="col-count">Count</th>
+                    <th class="col-count">Count / Size</th>
                     <th class="col-actions">Actions</th>
                 </tr>
             </thead>
             <tbody>
     `;
 
-    for (const domain of domainData) {
+    for (const domain of filteredData) {
         const isExpanded = expandedDomains.has(domain.domain);
         const itemKey = `domain:${domain.account_id}:${domain.domain}`;
         const isSelected = selectedItems.has(itemKey);
@@ -368,10 +393,11 @@ function renderDomainsTable() {
                     </div>
                 </td>
                 <td onclick="toggleDomain('${escapeAttr(domain.domain)}')">${domain.sender_count} sender${domain.sender_count !== 1 ? 's' : ''}</td>
-                <td class="domain-count" onclick="toggleDomain('${escapeAttr(domain.domain)}')">${domain.total_count}</td>
+                <td class="domain-count" onclick="toggleDomain('${escapeAttr(domain.domain)}')">${domain.total_count}<span class="size-badge">${formatSize(domain.total_size || 0)}</span></td>
                 <td class="domain-actions" onclick="event.stopPropagation()">
-                    <button class="action-btn trash" onclick="confirmTrash('${domain.account_id}', null, '${escapeAttr(domain.domain)}', ${domain.total_count})">Trash All</button>
-                    <button class="action-btn spam" onclick="confirmSpam('${domain.account_id}', null, '${escapeAttr(domain.domain)}', ${domain.total_count})">Spam All</button>
+                    <button class="action-btn filter" onclick="createFilter('${domain.account_id}', null, '${escapeAttr(domain.domain)}')" title="Create filter for entire domain">Filter</button>
+                    <button class="action-btn trash" onclick="confirmTrash('${domain.account_id}', null, '${escapeAttr(domain.domain)}', ${domain.total_count})">Trash</button>
+                    <button class="action-btn spam" onclick="confirmSpam('${domain.account_id}', null, '${escapeAttr(domain.domain)}', ${domain.total_count})">Spam</button>
                 </td>
             </tr>
         `;
@@ -388,10 +414,11 @@ function renderDomainsTable() {
                             ${sender.has_unsubscribe ? '<span class="unsub-indicator" title="Unsubscribe available"></span>' : ''}
                             <span class="sender-email">${escapeHtml(sender.email)}</span>
                         </td>
-                        <td class="sender-count">${sender.count}</td>
+                        <td class="sender-count">${sender.count}<span class="size-badge">${formatSize(sender.total_size || 0)}</span></td>
                         <td class="sender-actions">
                             <button class="action-btn view" onclick="showSenderDetails('${domain.account_id}', '${escapeAttr(sender.email)}')">View</button>
-                            ${sender.has_unsubscribe ? `<button class="action-btn unsub" onclick="openUnsubscribe('${domain.account_id}', '${escapeAttr(sender.email)}')">Unsubscribe</button>` : ''}
+                            ${sender.has_unsubscribe ? `<button class="action-btn unsub" onclick="openUnsubscribe('${domain.account_id}', '${escapeAttr(sender.email)}')">Unsub</button>` : ''}
+                            <button class="action-btn filter" onclick="createFilter('${domain.account_id}', '${escapeAttr(sender.email)}', null)">Filter</button>
                             <button class="action-btn trash" onclick="confirmTrash('${domain.account_id}', '${escapeAttr(sender.email)}', null, ${sender.count})">Trash</button>
                             <button class="action-btn spam" onclick="confirmSpam('${domain.account_id}', '${escapeAttr(sender.email)}', null, ${sender.count})">Spam</button>
                         </td>
@@ -453,11 +480,12 @@ async function openUnsubscribe(accountId, senderEmail) {
 
         if (result.success && result.unsubscribe_link) {
             window.open(result.unsubscribe_link, '_blank');
+            showToast('Opening unsubscribe page...', 'info');
         } else {
-            alert('No unsubscribe link found for this sender.');
+            showToast('No unsubscribe link found for this sender.', 'warning');
         }
     } catch (err) {
-        alert('Error: ' + err.message);
+        showToast('Error: ' + err.message, 'error');
     }
 }
 
@@ -516,11 +544,12 @@ async function executeSpam(accountId, senderEmail, domain) {
             removeFromLocalData(accountId, senderEmail, domain);
             renderResults();
             restoreScrollPosition();
+            showToast(`Marked ${result.marked_count} email(s) as spam`, 'success');
         } else {
-            alert('Error: ' + result.error);
+            showToast('Error: ' + result.error, 'error');
         }
     } catch (err) {
-        alert('Error: ' + err.message);
+        showToast('Error: ' + err.message, 'error');
     }
 }
 
@@ -539,11 +568,12 @@ async function executeTrash(accountId, senderEmail, domain) {
             removeFromLocalData(accountId, senderEmail, domain);
             renderResults();
             restoreScrollPosition();
+            showToast(`Moved ${result.trashed_count} email(s) to trash`, 'success');
         } else {
-            alert('Error: ' + result.error);
+            showToast('Error: ' + result.error, 'error');
         }
     } catch (err) {
-        alert('Error: ' + err.message);
+        showToast('Error: ' + err.message, 'error');
     }
 }
 
@@ -614,6 +644,8 @@ async function executeBulkTrash() {
     const items = Array.from(selectedItems);
     let successCount = 0;
 
+    showToast('Processing bulk trash...', 'info');
+
     for (const item of items) {
         const [type, accountId, identifier] = item.split(':');
         try {
@@ -634,6 +666,7 @@ async function executeBulkTrash() {
     selectedItems.clear();
     renderResults();
     restoreScrollPosition();
+    showToast(`Trashed emails from ${successCount} source(s)`, 'success');
 }
 
 async function executeBulkSpam() {
@@ -641,6 +674,8 @@ async function executeBulkSpam() {
 
     const items = Array.from(selectedItems);
     let successCount = 0;
+
+    showToast('Processing bulk spam...', 'info');
 
     for (const item of items) {
         const [type, accountId, identifier] = item.split(':');
@@ -662,6 +697,7 @@ async function executeBulkSpam() {
     selectedItems.clear();
     renderResults();
     restoreScrollPosition();
+    showToast(`Marked emails from ${successCount} source(s) as spam`, 'success');
 }
 
 // Utility functions
@@ -701,3 +737,158 @@ document.querySelectorAll('.modal').forEach(modal => {
         }
     });
 });
+
+// ============================================
+// Toast Notifications
+// ============================================
+function showToast(message, type = 'info', duration = 4000) {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+        <span>${escapeHtml(message)}</span>
+        <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
+    `;
+    container.appendChild(toast);
+
+    // Auto-remove after duration
+    setTimeout(() => {
+        toast.classList.add('hiding');
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+}
+
+// ============================================
+// Dark Mode Toggle
+// ============================================
+function toggleTheme() {
+    const html = document.documentElement;
+    const currentTheme = html.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateThemeIcon(newTheme);
+}
+
+function updateThemeIcon(theme) {
+    const icon = document.getElementById('theme-icon');
+    icon.textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+
+// Initialize theme on load
+(function initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    // Wait for DOM to be ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => updateThemeIcon(savedTheme));
+    } else {
+        updateThemeIcon(savedTheme);
+    }
+})();
+
+// ============================================
+// Search & Filter Results
+// ============================================
+let searchQuery = '';
+
+function filterResults() {
+    searchQuery = document.getElementById('results-search').value.toLowerCase();
+    renderResults();
+}
+
+function getFilteredSenderData() {
+    if (!searchQuery) return senderData;
+    return senderData.filter(s =>
+        s.name.toLowerCase().includes(searchQuery) ||
+        s.email.toLowerCase().includes(searchQuery) ||
+        s.domain.toLowerCase().includes(searchQuery)
+    );
+}
+
+function getFilteredDomainData() {
+    if (!searchQuery) return domainData;
+    return domainData.filter(d =>
+        d.domain.toLowerCase().includes(searchQuery)
+    );
+}
+
+// ============================================
+// Sorting
+// ============================================
+let currentSort = 'count-desc';
+
+function sortResults() {
+    currentSort = document.getElementById('sort-select').value;
+    applySorting();
+    renderResults();
+}
+
+function applySorting() {
+    const [field, direction] = currentSort.split('-');
+    const multiplier = direction === 'desc' ? -1 : 1;
+
+    if (currentView === 'senders') {
+        senderData.sort((a, b) => {
+            if (field === 'count') return (a.count - b.count) * multiplier;
+            if (field === 'size') return (a.total_size - b.total_size) * multiplier;
+            if (field === 'name') return a.name.localeCompare(b.name) * multiplier;
+            return 0;
+        });
+    } else {
+        domainData.sort((a, b) => {
+            if (field === 'count') return (a.total_count - b.total_count) * multiplier;
+            if (field === 'size') return (a.total_size - b.total_size) * multiplier;
+            if (field === 'name') return a.domain.localeCompare(b.domain) * multiplier;
+            return 0;
+        });
+    }
+}
+
+// ============================================
+// Export CSV
+// ============================================
+function exportCSV() {
+    const view = currentView;
+    window.location.href = `/api/export/csv?view=${view}`;
+    showToast(`Exporting ${view} data to CSV...`, 'info');
+}
+
+// ============================================
+// Create Gmail Filter
+// ============================================
+async function createFilter(accountId, senderEmail, domain, action = 'trash') {
+    try {
+        const result = await api('/api/action/filter', 'POST', {
+            account_id: accountId,
+            sender_email: senderEmail,
+            domain: domain,
+            action: action
+        });
+
+        if (result.success) {
+            const target = senderEmail || domain;
+            showToast(`Filter created for ${target}! Future emails will be ${action}ed.`, 'success');
+        } else {
+            showToast('Error creating filter: ' + result.error, 'error');
+        }
+    } catch (err) {
+        showToast('Error creating filter: ' + err.message, 'error');
+    }
+}
+
+// ============================================
+// Format Size Helper
+// ============================================
+function formatSize(bytes) {
+    if (bytes === 0 || !bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+// ============================================
+// Updated Render with Size Display
+// ============================================
+// Override the original render functions to include size and use filtered/sorted data

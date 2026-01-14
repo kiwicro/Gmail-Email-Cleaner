@@ -53,6 +53,7 @@ class EmailInfo:
     subject: str
     date: str
     snippet: str
+    size: int = 0  # Size in bytes
     unsubscribe_link: Optional[str] = None
 
 
@@ -63,12 +64,14 @@ class SenderAggregation:
     name: str
     domain: str
     count: int = 0
+    total_size: int = 0  # Total size in bytes
     emails: list[EmailInfo] = field(default_factory=list)
     unsubscribe_link: Optional[str] = None
 
     def add_email(self, email_info: EmailInfo) -> None:
         """Add an email to this aggregation."""
         self.count += 1
+        self.total_size += email_info.size
         self.emails.append(email_info)
         # Keep the most recent unsubscribe link
         if email_info.unsubscribe_link:
@@ -80,6 +83,7 @@ class DomainAggregation:
     """Aggregated data for a domain."""
     domain: str
     total_count: int = 0
+    total_size: int = 0  # Total size in bytes
     senders: dict[str, SenderAggregation] = field(default_factory=dict)
 
     def add_sender(self, sender: SenderAggregation) -> None:
@@ -90,10 +94,12 @@ class DomainAggregation:
             # Merge emails
             existing = self.senders[sender.email]
             existing.count += sender.count
+            existing.total_size += sender.total_size
             existing.emails.extend(sender.emails)
             if sender.unsubscribe_link:
                 existing.unsubscribe_link = sender.unsubscribe_link
         self.total_count += sender.count
+        self.total_size += sender.total_size
 
 
 @dataclass
@@ -102,6 +108,7 @@ class AccountAggregation:
     account_id: str
     email_address: str
     total_emails: int = 0
+    total_size: int = 0  # Total size in bytes
     senders: dict[str, SenderAggregation] = field(default_factory=dict)
     domains: dict[str, DomainAggregation] = field(default_factory=dict)
 
@@ -161,6 +168,7 @@ class EmailAggregator:
         subject = get_header_value(headers, 'Subject')
         date = get_header_value(headers, 'Date')
         snippet = details.get('snippet', '')
+        size = details.get('sizeEstimate', 0)
 
         # Get unsubscribe link with validation
         unsubscribe = get_header_value(headers, 'List-Unsubscribe')
@@ -178,6 +186,7 @@ class EmailAggregator:
             subject=subject,
             date=date,
             snippet=snippet,
+            size=size,
             unsubscribe_link=unsubscribe_link
         )
 
@@ -254,6 +263,7 @@ class EmailAggregator:
         for sender in senders_data.values():
             aggregation.senders[sender.email] = sender
             aggregation.total_emails += sender.count
+            aggregation.total_size += sender.total_size
 
             if sender.domain not in domains_data:
                 domains_data[sender.domain] = DomainAggregation(domain=sender.domain)

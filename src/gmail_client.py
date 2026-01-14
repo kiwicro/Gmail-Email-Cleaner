@@ -377,6 +377,54 @@ class GmailClient:
             print(f"Error trashing messages: {e}")
             return False
 
+    def create_filter(self, sender_email: str = None, domain: str = None,
+                      action: str = 'trash') -> dict:
+        """
+        Create a Gmail filter for a sender or domain.
+
+        Args:
+            sender_email: Email address to filter
+            domain: Domain to filter (alternative to sender_email)
+            action: 'trash', 'spam', 'archive', or 'read'
+
+        Returns:
+            Filter creation result or error dict
+        """
+        if not self.service:
+            raise RuntimeError("Not authenticated. Call authenticate() first.")
+
+        # Build the filter criteria
+        if sender_email:
+            criteria = {'from': sender_email}
+        elif domain:
+            criteria = {'from': f'@{domain}'}
+        else:
+            return {'success': False, 'error': 'sender_email or domain required'}
+
+        # Build the action
+        action_config = {}
+        if action == 'trash':
+            action_config = {'addLabelIds': ['TRASH'], 'removeLabelIds': ['INBOX']}
+        elif action == 'spam':
+            action_config = {'addLabelIds': ['SPAM'], 'removeLabelIds': ['INBOX']}
+        elif action == 'archive':
+            action_config = {'removeLabelIds': ['INBOX']}
+        elif action == 'read':
+            action_config = {'removeLabelIds': ['UNREAD']}
+
+        try:
+            result = self.service.users().settings().filters().create(
+                userId='me',
+                body={
+                    'criteria': criteria,
+                    'action': action_config
+                }
+            ).execute()
+            return {'success': True, 'filter_id': result.get('id')}
+        except HttpError as e:
+            print(f"Error creating filter: {e}")
+            return {'success': False, 'error': str(e)}
+
     def get_unsubscribe_link(self, message_id: str) -> Optional[str]:
         """
         Extract unsubscribe link from message headers.
