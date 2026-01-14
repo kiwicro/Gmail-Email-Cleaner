@@ -100,9 +100,10 @@ Since this tool accesses your Gmail, you need to create your own Google Cloud cr
 4. Click **Save and Continue**
 5. On the **Scopes** page:
    - Click **Add or Remove Scopes**
-   - Find and check these two scopes:
+   - Find and check these scopes:
      - `https://www.googleapis.com/auth/gmail.readonly`
      - `https://www.googleapis.com/auth/gmail.modify`
+     - `https://www.googleapis.com/auth/gmail.settings.basic`
    - Click **Update**
 6. Click **Save and Continue**
 7. On **Test users** page:
@@ -197,39 +198,80 @@ Gmail-Email-Cleaner/
 
 ---
 
-## Security Notes
+## Security & Privacy
 
-### What This Tool Can Access
+### Privacy Guarantees
 
-With the permissions granted, this tool can:
-- ✅ Read your email metadata (sender, subject, date)
-- ✅ Read email snippets
-- ✅ Move emails to spam or trash
-- ✅ Read List-Unsubscribe headers
+| Guarantee | How It's Enforced |
+|-----------|------------------|
+| **Data never leaves your machine** | Server binds to `127.0.0.1` only - not accessible from network |
+| **No email content stored on disk** | All scan data held in memory, cleared on app restart |
+| **No analytics or telemetry** | Zero external API calls except Gmail API |
+| **No third-party services** | Direct OAuth with Google - no middleman |
+| **Open source** | Full code available for inspection |
 
-It **cannot**:
+### OAuth Scopes Explained
+
+This tool requests only the minimum permissions needed:
+
+| Scope | Purpose | What It Allows |
+|-------|---------|----------------|
+| `gmail.readonly` | Read email headers | Sender, subject, date, snippets - **NOT full body** |
+| `gmail.modify` | Take action on emails | Move to spam/trash, mark read |
+| `gmail.settings.basic` | Create filters | Auto-trash future emails from senders |
+
+**This tool CANNOT:**
 - ❌ Read full email body content
 - ❌ Send emails on your behalf
-- ❌ Delete emails permanently (only trash)
-- ❌ Access your contacts or calendar
+- ❌ Permanently delete emails (only trash - recoverable for 30 days)
+- ❌ Access contacts, calendar, or other Google services
+
+### Token Storage Security
+
+| Protection | Implementation |
+|------------|----------------|
+| **File permissions** | Tokens saved with 600 permissions (owner read/write only) on Unix |
+| **Local storage only** | Tokens stored in `data/tokens/` - excluded from git |
+| **No encryption** | Tokens are plain JSON - protected by OS file permissions |
+| **Easy revocation** | Delete token files or revoke via Google Account |
+
+### Application Security
+
+| Vulnerability | Protection |
+|---------------|------------|
+| **Path Traversal** | Account IDs sanitized - only alphanumeric, underscore, hyphen allowed |
+| **XSS (Cross-Site Scripting)** | All user data escaped before rendering via `escapeHtml()` and `escapeAttr()` |
+| **Malicious URLs** | Unsubscribe links validated - only http/https/mailto allowed, localhost blocked |
+| **Input Injection** | All API parameters validated and bounds-checked |
+| **Session Hijacking** | Cryptographically random session keys, regenerated each restart |
+| **Memory Leaks** | Automatic cleanup of old scan progress entries |
 
 ### Where Your Data Lives
 
-| Data | Location | Shared? |
-|------|----------|---------|
-| OAuth credentials | `config/credentials.json` | Never - local only |
-| OAuth tokens | `data/tokens/` | Never - local only |
-| Email data | Memory only | Never - not even saved to disk |
-| Scan results | Memory only | Never - cleared on restart |
+| Data | Location | Persistence | Shared Externally? |
+|------|----------|-------------|-------------------|
+| OAuth credentials | `config/credentials.json` | Until you delete | ❌ Never |
+| OAuth tokens | `data/tokens/*.json` | Until you delete | ❌ Never |
+| Email metadata | Memory only | Until app restart | ❌ Never |
+| Scan results | Memory only | Until app restart | ❌ Never |
 
 ### Revoking Access
 
-To disconnect this tool from your Gmail:
-1. Go to [Google Account Security](https://myaccount.google.com/permissions)
+**Option 1: Remove from Google Account**
+1. Go to [Google Account Permissions](https://myaccount.google.com/permissions)
 2. Find "Gmail Cleanmail" (or your app name)
 3. Click **Remove Access**
 
-Or simply delete the token files in `data/tokens/`
+**Option 2: Delete Local Tokens**
+```bash
+# Delete all stored tokens
+rm data/tokens/*_token.json
+```
+
+**Option 3: Both** (recommended for complete removal)
+1. Revoke access in Google Account
+2. Delete local token files
+3. Optionally delete `config/credentials.json`
 
 ---
 
