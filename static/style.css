@@ -282,11 +282,11 @@ main {
 .pivot-table th.col-checkbox { width: 40px; }
 .pivot-table th.col-domain { width: 20%; }
 .pivot-table th.col-sender { width: 25%; }
-.pivot-table th.col-count { width: 12%; text-align: right; }
+.pivot-table th.col-count { width: 12%; text-align: left; }
 .pivot-table th.col-actions { width: 33%; text-align: right; }
 
 .pivot-table td.col-count {
-    text-align: right;
+    text-align: left;
     font-variant-numeric: tabular-nums;
 }
 
@@ -341,7 +341,7 @@ main {
 }
 
 .domain-row .domain-count {
-    text-align: right;
+    text-align: left;
     color: var(--primary);
     font-weight: 700;
     white-space: nowrap;
@@ -386,7 +386,7 @@ main {
 }
 
 .sender-row .sender-count {
-    text-align: right;
+    text-align: left;
     color: var(--text);
     white-space: nowrap;
 }
