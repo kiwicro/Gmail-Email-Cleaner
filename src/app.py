@@ -1,5 +1,5 @@
 """
-Flask web application for Email Cleaner.
+Flask web application for Gmail Email Cleanmail.
 All data stays local - served only on localhost.
 """
 
@@ -57,15 +57,17 @@ def add_account():
                 'email': client.email_address
             }
         })
-    except FileNotFoundError as e:
+    except FileNotFoundError:
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': 'OAuth credentials not configured. Please check README for setup instructions.'
         }), 400
     except Exception as e:
+        # Log the actual error server-side, but don't expose details to client
+        print(f"[ERROR] Authentication failed: {e}")
         return jsonify({
             'success': False,
-            'error': f'Authentication failed: {str(e)}'
+            'error': 'Authentication failed. Please try again.'
         }), 500
 
 
@@ -117,7 +119,7 @@ def start_scan():
     """Start scanning emails for aggregation."""
     data = request.json or {}
     account_id = data.get('account_id')  # None means all accounts
-    max_emails = data.get('max_emails', 500)
+    max_emails = data.get('max_emails')  # None means all emails
     query = data.get('query', '')
 
     scan_id = secrets.token_hex(8)
@@ -155,7 +157,17 @@ def get_results():
     """Get aggregation results."""
     account_id = request.args.get('account_id')
     view = request.args.get('view', 'senders')  # 'senders' or 'domains'
-    limit = int(request.args.get('limit', 50))
+
+    # Input validation with bounds checking
+    try:
+        limit = int(request.args.get('limit', 50))
+        limit = max(1, min(limit, 10000))  # Clamp between 1 and 10000
+    except (ValueError, TypeError):
+        limit = 50
+
+    # Validate view parameter
+    if view not in ('senders', 'domains'):
+        view = 'senders'
 
     if view == 'domains':
         results = aggregator.get_top_domains(account_id, limit)
@@ -345,7 +357,7 @@ def get_unsubscribe():
 def run_app(host='127.0.0.1', port=5000, debug=False):
     """Run the Flask application."""
     print(f"\n{'='*60}")
-    print("  Email Cleaner - Local Gmail Aggregation Tool")
+    print("  Gmail Email Cleanmail - Local Gmail Aggregation Tool")
     print(f"{'='*60}")
     print(f"\n  Open your browser to: http://{host}:{port}")
     print(f"\n  All data stays on your local machine.")

@@ -1,6 +1,14 @@
 # OAuth credentials - NEVER commit these
 config/credentials.json
-data/tokens/
+config/*.json
+!config/.gitkeep
+data/tokens/*
+!data/tokens/.gitkeep
+*.token.json
+
+# Environment files
+.env
+.env.*
 
 # Python
 __pycache__/

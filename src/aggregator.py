@@ -8,8 +8,42 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from email.utils import parseaddr
 from typing import Optional
+from urllib.parse import urlparse
 
 from .gmail_client import GmailClient, GmailAccountManager
+
+
+def validate_unsubscribe_url(url: str) -> Optional[str]:
+    """
+    Validate unsubscribe URL to prevent malicious links.
+    Returns the URL if safe, None otherwise.
+    """
+    if not url:
+        return None
+
+    try:
+        parsed = urlparse(url)
+
+        # Only allow http/https and mailto
+        if parsed.scheme not in ('http', 'https', 'mailto'):
+            return None
+
+        # Block javascript: and data: schemes (defense in depth)
+        if parsed.scheme.lower() in ('javascript', 'data', 'vbscript'):
+            return None
+
+        # For http/https, ensure there's a valid host
+        if parsed.scheme in ('http', 'https'):
+            if not parsed.netloc:
+                return None
+            # Block localhost/internal IPs to prevent SSRF-like issues
+            host = parsed.netloc.lower().split(':')[0]
+            if host in ('localhost', '127.0.0.1', '0.0.0.0', '::1'):
+                return None
+
+        return url
+    except Exception:
+        return None
 
 
 @dataclass
@@ -128,13 +162,14 @@ class EmailAggregator:
         date = get_header_value(headers, 'Date')
         snippet = details.get('snippet', '')
 
-        # Get unsubscribe link
+        # Get unsubscribe link with validation
         unsubscribe = get_header_value(headers, 'List-Unsubscribe')
         unsubscribe_link = None
         if unsubscribe:
             urls = re.findall(r'<(https?://[^>]+)>', unsubscribe)
             if urls:
-                unsubscribe_link = urls[0]
+                # Validate URL to prevent malicious links
+                unsubscribe_link = validate_unsubscribe_url(urls[0])
 
         name, email, domain = extract_sender_info(from_header)
 
@@ -151,7 +186,7 @@ class EmailAggregator:
     def aggregate_account(
         self,
         account_id: str,
-        max_emails: int = 500,
+        max_emails: int = None,
         query: str = '',
         progress_callback=None
     ) -> AccountAggregation:
@@ -231,7 +266,7 @@ class EmailAggregator:
 
     def aggregate_all_accounts(
         self,
-        max_emails_per_account: int = 500,
+        max_emails_per_account: int = None,
         query: str = '',
         progress_callback=None
     ) -> dict[str, AccountAggregation]:

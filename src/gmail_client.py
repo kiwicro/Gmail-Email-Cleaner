@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 from typing import Optional
 from email.utils import parseaddr
+from urllib.parse import urlparse
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -33,6 +34,44 @@ TOKENS_DIR = BASE_DIR / 'data' / 'tokens'
 TOKENS_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def sanitize_account_id(account_id: str) -> str:
+    """
+    Sanitize account_id to prevent path traversal attacks.
+    Only allows alphanumeric characters, underscores, and hyphens.
+    """
+    # Remove any path separators and suspicious characters
+    sanitized = re.sub(r'[^a-zA-Z0-9_-]', '', account_id)
+    if not sanitized:
+        sanitized = 'default_account'
+    # Limit length to prevent filesystem issues
+    return sanitized[:64]
+
+
+def validate_url(url: str) -> Optional[str]:
+    """
+    Validate URL to prevent malicious links.
+    Returns the URL if safe, None otherwise.
+    """
+    if not url:
+        return None
+
+    try:
+        parsed = urlparse(url)
+
+        # Only allow http/https and mailto
+        if parsed.scheme not in ('http', 'https', 'mailto'):
+            return None
+
+        # For http/https, ensure there's a valid host
+        if parsed.scheme in ('http', 'https'):
+            if not parsed.netloc:
+                return None
+
+        return url
+    except Exception:
+        return None
+
+
 class GmailClient:
     """Handles Gmail API authentication and operations for a single account."""
 
@@ -43,7 +82,7 @@ class GmailClient:
         Args:
             account_id: Unique identifier for this account (used for token storage)
         """
-        self.account_id = account_id
+        self.account_id = sanitize_account_id(account_id)
         self.credentials: Optional[Credentials] = None
         self.service = None
         self.email_address: Optional[str] = None
@@ -119,12 +158,12 @@ class GmailClient:
         self.service = None
         self.email_address = None
 
-    def get_messages(self, max_results: int = 500, query: str = '') -> list[dict]:
+    def get_messages(self, max_results: int = None, query: str = '') -> list[dict]:
         """
         Fetch messages from Gmail.
 
         Args:
-            max_results: Maximum number of messages to fetch
+            max_results: Maximum number of messages to fetch (None = all messages)
             query: Gmail search query (e.g., 'is:unread', 'from:example.com')
 
         Returns:
@@ -135,27 +174,44 @@ class GmailClient:
 
         messages = []
         page_token = None
+        page_count = 0
 
-        while len(messages) < max_results:
+        print(f"[DEBUG] Starting fetch: max_results={'ALL' if max_results is None else max_results}, query='{query}'")
+
+        while True:
             try:
+                # Calculate how many to request this batch
+                if max_results is None:
+                    request_size = 500  # Max allowed by Gmail API per request
+                else:
+                    remaining = max_results - len(messages)
+                    if remaining <= 0:
+                        break
+                    request_size = min(500, remaining)
+
                 results = self.service.users().messages().list(
                     userId='me',
-                    maxResults=min(100, max_results - len(messages)),
+                    maxResults=request_size,
                     pageToken=page_token,
-                    q=query
+                    q=query if query else None
                 ).execute()
 
                 batch = results.get('messages', [])
                 messages.extend(batch)
+                page_count += 1
+
+                print(f"[DEBUG] Page {page_count}: got {len(batch)} messages (total: {len(messages)})")
 
                 page_token = results.get('nextPageToken')
                 if not page_token:
+                    print(f"[DEBUG] No more pages, total messages: {len(messages)}")
                     break
 
             except HttpError as e:
-                print(f"Error fetching messages: {e}")
+                print(f"[ERROR] Error fetching messages: {e}")
                 break
 
+        print(f"[DEBUG] Fetch complete: {len(messages)} messages retrieved")
         return messages
 
     def get_message_details(self, message_id: str) -> dict:
@@ -349,11 +405,11 @@ class GmailClient:
                     # Extract URL from header (can be <url> or <mailto:...>)
                     urls = re.findall(r'<(https?://[^>]+)>', value)
                     if urls:
-                        return urls[0]
+                        return validate_url(urls[0])
                     # Check for mailto as fallback
                     mailto = re.findall(r'<(mailto:[^>]+)>', value)
                     if mailto:
-                        return mailto[0]
+                        return validate_url(mailto[0])
             return None
         except HttpError:
             return None

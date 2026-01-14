@@ -1,4 +1,4 @@
-// Email Cleaner - Frontend JavaScript
+// Gmail Email Cleanmail - Frontend JavaScript
 
 let currentView = 'senders';
 let senderData = [];
@@ -58,7 +58,6 @@ async function removeAccount(accountId) {
 
 // Scanning
 async function startScan() {
-    const maxEmails = document.getElementById('max-emails').value;
     const query = document.getElementById('query-filter').value;
     const scanBtn = document.getElementById('scan-btn');
     const progressContainer = document.getElementById('scan-progress');
@@ -68,11 +67,10 @@ async function startScan() {
     scanBtn.disabled = true;
     progressContainer.style.display = 'block';
     progressFill.style.width = '0%';
-    progressText.textContent = 'Starting scan...';
+    progressText.textContent = 'Starting scan (fetching all emails)...';
 
     try {
         const result = await api('/api/scan', 'POST', {
-            max_emails: parseInt(maxEmails),
             query: query
         });
 
@@ -134,10 +132,10 @@ async function loadResults() {
     section.style.display = 'block';
 
     try {
-        // Load both views
+        // Load both views - get all results
         const [senderResult, domainResult] = await Promise.all([
-            api('/api/results?view=senders&limit=100'),
-            api('/api/results?view=domains&limit=100')
+            api('/api/results?view=senders&limit=10000'),
+            api('/api/results?view=domains&limit=10000')
         ]);
         senderData = senderResult.results || [];
         domainData = domainResult.results || [];
@@ -676,7 +674,15 @@ function escapeHtml(text) {
 
 function escapeAttr(text) {
     if (!text) return '';
-    return text.replace(/'/g, "\\'").replace(/"/g, '\\"');
+    // Properly escape for HTML attributes to prevent XSS
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/'/g, '&#x27;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\\/g, '&#x5c;')
+        .replace(/`/g, '&#x60;');
 }
 
 // Close modals on escape key

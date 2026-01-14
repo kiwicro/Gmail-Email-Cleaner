@@ -1,1 +1,1 @@
-# Email Cleaner - Local Gmail aggregation tool
+# Gmail Email Cleanmail - Local Gmail aggregation tool

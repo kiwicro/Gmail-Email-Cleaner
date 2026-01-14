@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email Cleaner - Local Gmail Aggregation</title>
+    <title>Gmail Email Cleanmail - Local Gmail Aggregation</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <header>
-        <h1>Email Cleaner</h1>
+        <h1>Gmail Email Cleanmail</h1>
         <p class="subtitle">Local Gmail aggregation - your data never leaves your machine</p>
     </header>
 
@@ -41,15 +41,11 @@
             <h2>Scan Emails</h2>
             <div class="scan-controls">
                 <div class="form-group">
-                    <label for="max-emails">Max emails per account:</label>
-                    <input type="number" id="max-emails" value="500" min="50" max="5000">
-                </div>
-                <div class="form-group">
                     <label for="query-filter">Filter (optional):</label>
                     <input type="text" id="query-filter" placeholder="e.g., is:unread, category:promotions">
                 </div>
                 <button id="scan-btn" class="btn btn-primary" onclick="startScan()">
-                    Scan All Accounts
+                    Scan All Emails
                 </button>
             </div>
             <div id="scan-progress" class="progress-container" style="display: none;">

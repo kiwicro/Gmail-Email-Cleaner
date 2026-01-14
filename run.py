@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Email Cleaner - Entry point
+Gmail Email Cleanmail - Entry point
 
 Run this script to start the local web interface.
 All data stays on your local machine - nothing is sent externally.
@@ -18,7 +18,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(
-        description='Email Cleaner - Local Gmail Aggregation Tool'
+        description='Gmail Email Cleanmail - Local Gmail Aggregation Tool'
     )
     parser.add_argument(
         '--port', '-p',
