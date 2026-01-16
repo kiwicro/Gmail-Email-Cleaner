@@ -1,0 +1,33 @@
+# Credentials and tokens
+config/credentials.json
+data/tokens/*.json
+
+# Keep directory structure
+!config/.gitkeep
+!data/.gitkeep
+!data/tokens/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# PyInstaller
+build/
+dist/
+*.manifest
+*.spec.bak
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
